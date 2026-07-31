@@ -14,7 +14,9 @@ import {
   type OpenRouterVariantModelAlias,
 } from '@roomote/types';
 
-import { mergeNonTaskOpenAiCompatibleProviderConfig } from './non-task-openai-compatible-provider-config';
+import {
+  mergeNonTaskOpenAiCompatibleProviderConfig,
+} from './non-task-openai-compatible-provider-config';
 
 const ESCAPE_CHARACTER = String.fromCharCode(27);
 const BELL_CHARACTER = String.fromCharCode(7);
