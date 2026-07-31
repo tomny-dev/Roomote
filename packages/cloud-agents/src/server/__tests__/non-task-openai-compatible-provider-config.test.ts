@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { mergeNonTaskOpenAiCompatibleProviderConfig } from '../non-task-openai-compatible-provider-config';
 import {
   buildOpenCodeCliEnv,
   NON_TASK_TOOL_PERMISSION_DENIALS,
 } from '../opencode-runtime';
 
 const MODEL_ID = 'qwen3.6:35b-unsloth';
+const SMALL_MODEL_ID = 'qwen3.6:8b';
 
 describe('non-task OpenAI-compatible provider config', () => {
   const managedKeys = [
@@ -18,8 +18,12 @@ describe('non-task OpenAI-compatible provider config', () => {
     'LITELLM_BASE_URL',
     'LITELLM_API_KEY',
     'OLLAMA_BASE_URL',
+    'VLLM_BASE_URL',
+    'VLLM_API_KEY',
     'OPENAI_BASE_URL',
     'OPENAI_API_KEY',
+    'OPENAI_COMPATIBLE_BASE_URL',
+    'OPENAI_COMPATIBLE_API_KEY',
     'OPENAI_COMPATIBLE_LOCAL_BASE_URL',
     'OPENAI_COMPATIBLE_LOCAL_API_KEY',
     'OPENAI_COMPATIBLE_LOCAL_LABEL',
@@ -45,10 +49,10 @@ describe('non-task OpenAI-compatible provider config', () => {
     }
   });
 
-  it('registers LiteLLM for model-backed helper servers', () => {
+  it('registers LiteLLM for distinct coding and helper models', () => {
     const env = buildOpenCodeCliEnv({
       R_MODEL: `litellm/${MODEL_ID}`,
-      R_SMALL_MODEL: `litellm/${MODEL_ID}`,
+      R_SMALL_MODEL: `litellm/${SMALL_MODEL_ID}`,
       LITELLM_BASE_URL: 'http://litellm:4000/v1',
       LITELLM_API_KEY: 'super-secret-key',
     });
@@ -56,6 +60,36 @@ describe('non-task OpenAI-compatible provider config', () => {
     const configContent = env.OPENCODE_CONFIG_CONTENT ?? '{}';
 
     expect(JSON.parse(configContent)).toEqual({
+      model: `litellm/${MODEL_ID}`,
+      small_model: `litellm/${SMALL_MODEL_ID}`,
+      provider: {
+        litellm: {
+          npm: '@ai-sdk/openai-compatible',
+          name: 'LiteLLM',
+          options: {
+            baseURL: 'http://litellm:4000/v1',
+            apiKey: '{env:LITELLM_API_KEY}',
+          },
+          models: {
+            [MODEL_ID]: { name: MODEL_ID },
+            [SMALL_MODEL_ID]: { name: SMALL_MODEL_ID },
+          },
+        },
+      },
+      permission: NON_TASK_TOOL_PERMISSION_DENIALS,
+    });
+    expect(configContent).not.toContain('super-secret-key');
+  });
+
+  it('preserves generated LiteLLM reasoning options while adding endpoint metadata', () => {
+    const env = buildOpenCodeCliEnv({
+      R_MODEL: `litellm/${MODEL_ID}`,
+      R_MODEL_REASONING_EFFORT: 'high',
+      LITELLM_BASE_URL: 'http://litellm:4000/v1',
+      LITELLM_API_KEY: 'secret',
+    });
+
+    expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}')).toEqual({
       model: `litellm/${MODEL_ID}`,
       small_model: `litellm/${MODEL_ID}`,
       provider: {
@@ -67,48 +101,14 @@ describe('non-task OpenAI-compatible provider config', () => {
             apiKey: '{env:LITELLM_API_KEY}',
           },
           models: {
-            [MODEL_ID]: { name: MODEL_ID },
-          },
-        },
-      },
-      permission: NON_TASK_TOOL_PERMISSION_DENIALS,
-    });
-    expect(configContent).not.toContain('super-secret-key');
-  });
-
-  it('preserves existing per-model options while adding endpoint metadata', () => {
-    const merged = mergeNonTaskOpenAiCompatibleProviderConfig(
-      {
-        litellm: {
-          models: {
             [MODEL_ID]: {
-              options: { reasoning: { effort: 'high' } },
+              name: MODEL_ID,
+              options: { reasoningEffort: 'high' },
             },
           },
         },
       },
-      {
-        LITELLM_BASE_URL: 'http://litellm:4000/v1',
-        LITELLM_API_KEY: 'secret',
-      },
-      [`litellm/${MODEL_ID}`],
-    );
-
-    expect(merged).toEqual({
-      litellm: {
-        npm: '@ai-sdk/openai-compatible',
-        name: 'LiteLLM',
-        options: {
-          baseURL: 'http://litellm:4000/v1',
-          apiKey: '{env:LITELLM_API_KEY}',
-        },
-        models: {
-          [MODEL_ID]: {
-            name: MODEL_ID,
-            options: { reasoning: { effort: 'high' } },
-          },
-        },
-      },
+      permission: NON_TASK_TOOL_PERMISSION_DENIALS,
     });
   });
 
@@ -137,6 +137,51 @@ describe('non-task OpenAI-compatible provider config', () => {
       },
     });
     expect(configContent).not.toContain('named-provider-secret');
+  });
+
+  it('does not inherit generic OpenAI credentials for the default compatible provider', () => {
+    const env = buildOpenCodeCliEnv({
+      R_MODEL: `openai-compatible/${MODEL_ID}`,
+      OPENAI_COMPATIBLE_BASE_URL: 'http://custom-provider:4000/v1',
+      OPENAI_BASE_URL: 'http://generic-openai:4000/v1',
+      OPENAI_API_KEY: 'generic-openai-secret',
+    });
+
+    const configContent = env.OPENCODE_CONFIG_CONTENT ?? '{}';
+    const config = JSON.parse(configContent) as {
+      provider: Record<string, { options: Record<string, unknown> }>;
+    };
+
+    expect(config.provider['openai-compatible'].options).toEqual({
+      baseURL: 'http://custom-provider:4000/v1',
+    });
+    expect(configContent).not.toContain('generic-openai-secret');
+  });
+
+  it('allows vLLM to use the generic OpenAI credential fallback', () => {
+    const env = buildOpenCodeCliEnv({
+      R_MODEL: `vllm/${MODEL_ID}`,
+      VLLM_BASE_URL: 'http://vllm:8000/v1',
+      OPENAI_API_KEY: 'fallback-secret',
+    });
+
+    const configContent = env.OPENCODE_CONFIG_CONTENT ?? '{}';
+    const config = JSON.parse(configContent) as {
+      provider: Record<string, unknown>;
+    };
+
+    expect(config.provider.vllm).toEqual({
+      npm: '@ai-sdk/openai-compatible',
+      name: 'vLLM',
+      options: {
+        baseURL: 'http://vllm:8000/v1',
+        apiKey: '{env:OPENAI_API_KEY}',
+      },
+      models: {
+        [MODEL_ID]: { name: MODEL_ID },
+      },
+    });
+    expect(configContent).not.toContain('fallback-secret');
   });
 
   it('supplies the placeholder API key required by keyless Ollama', () => {
