@@ -1,4 +1,5 @@
 import {
+  buildOpenAiCompatibleProviderInstance,
   getOpenAiCompatibleProviderInstance,
   isOpenAiCompatibleProviderId,
   OPENAI_COMPATIBLE_PROVIDER_ID,
@@ -7,12 +8,17 @@ import {
 const OPENAI_COMPATIBLE_DEFAULT_FALLBACK_BASE_URL =
   'http://127.0.0.1:4000/v1';
 
+const DEFAULT_OPENAI_COMPATIBLE_INSTANCE =
+  buildOpenAiCompatibleProviderInstance(null);
+
 const STATIC_OPENAI_COMPATIBLE_PROVIDER_CONFIGS = {
   [OPENAI_COMPATIBLE_PROVIDER_ID]: {
-    name: 'OpenAI-compatible',
-    baseUrlEnvVarName: 'OPENAI_COMPATIBLE_BASE_URL',
+    name: DEFAULT_OPENAI_COMPATIBLE_INSTANCE.label,
+    baseUrlEnvVarName: DEFAULT_OPENAI_COMPATIBLE_INSTANCE.baseUrlEnvVarName,
     fallbackBaseUrl: OPENAI_COMPATIBLE_DEFAULT_FALLBACK_BASE_URL,
-    apiKeyEnvVarName: 'OPENAI_COMPATIBLE_API_KEY' as string | undefined,
+    apiKeyEnvVarName: DEFAULT_OPENAI_COMPATIBLE_INSTANCE.apiKeyEnvVarName as
+      | string
+      | undefined,
     keyless: false,
     allowOpenAiEnvFallback: false,
   },
