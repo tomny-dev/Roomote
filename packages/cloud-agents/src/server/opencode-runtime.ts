@@ -14,6 +14,8 @@ import {
   type OpenRouterVariantModelAlias,
 } from '@roomote/types';
 
+import { mergeNonTaskOpenAiCompatibleProviderConfig } from './non-task-openai-compatible-provider-config';
+
 const ESCAPE_CHARACTER = String.fromCharCode(27);
 const BELL_CHARACTER = String.fromCharCode(7);
 const ANSI_CSI_PATTERN = new RegExp(
@@ -86,9 +88,10 @@ function buildModelBackedOpenCodeConfigContent(
           smallModel,
         ])
       : providerReasoningConfig;
-  const providerConfig = mergeOpenRouterVariantAliasModels(
-    providerModelConfig,
-    variantAliases,
+  const providerConfig = mergeNonTaskOpenAiCompatibleProviderConfig(
+    mergeOpenRouterVariantAliasModels(providerModelConfig, variantAliases),
+    env,
+    [model, smallModel],
   );
 
   return JSON.stringify({
