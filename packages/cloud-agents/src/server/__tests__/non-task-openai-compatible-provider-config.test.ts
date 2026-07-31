@@ -149,11 +149,18 @@ describe('non-task OpenAI-compatible provider config', () => {
 
     const configContent = env.OPENCODE_CONFIG_CONTENT ?? '{}';
     const config = JSON.parse(configContent) as {
-      provider: Record<string, { options: Record<string, unknown> }>;
+      provider: Record<string, unknown>;
     };
 
-    expect(config.provider['openai-compatible'].options).toEqual({
-      baseURL: 'http://custom-provider:4000/v1',
+    expect(config.provider['openai-compatible']).toEqual({
+      npm: '@ai-sdk/openai-compatible',
+      name: 'OpenAI-compatible',
+      options: {
+        baseURL: 'http://custom-provider:4000/v1',
+      },
+      models: {
+        [MODEL_ID]: { name: MODEL_ID },
+      },
     });
     expect(configContent).not.toContain('generic-openai-secret');
   });
