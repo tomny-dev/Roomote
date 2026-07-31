@@ -1,26 +1,18 @@
 import {
-  buildOpenAiCompatibleProviderInstance,
   getOpenAiCompatibleProviderInstance,
   isOpenAiCompatibleProviderId,
-  listOpenAiCompatibleProviderInstancesFromEnvNames,
   OPENAI_COMPATIBLE_PROVIDER_ID,
-  type OpenAiCompatibleProviderInstance,
 } from '@roomote/types';
 
 const OPENAI_COMPATIBLE_DEFAULT_FALLBACK_BASE_URL =
   'http://127.0.0.1:4000/v1';
 
-const DEFAULT_OPENAI_COMPATIBLE_INSTANCE =
-  buildOpenAiCompatibleProviderInstance(null);
-
 const STATIC_OPENAI_COMPATIBLE_PROVIDER_CONFIGS = {
   [OPENAI_COMPATIBLE_PROVIDER_ID]: {
-    name: DEFAULT_OPENAI_COMPATIBLE_INSTANCE.label,
-    baseUrlEnvVarName: DEFAULT_OPENAI_COMPATIBLE_INSTANCE.baseUrlEnvVarName,
+    name: 'OpenAI-compatible',
+    baseUrlEnvVarName: 'OPENAI_COMPATIBLE_BASE_URL',
     fallbackBaseUrl: OPENAI_COMPATIBLE_DEFAULT_FALLBACK_BASE_URL,
-    apiKeyEnvVarName: DEFAULT_OPENAI_COMPATIBLE_INSTANCE.apiKeyEnvVarName as
-      | string
-      | undefined,
+    apiKeyEnvVarName: 'OPENAI_COMPATIBLE_API_KEY' as string | undefined,
     keyless: false,
     allowOpenAiEnvFallback: false,
   },
@@ -62,86 +54,44 @@ type OpenAiCompatibleProviderRuntimeConfig = {
   allowOpenAiEnvFallback: boolean;
 };
 
-function toNamedOpenAiCompatibleRuntimeConfig(
-  instance: OpenAiCompatibleProviderInstance,
-): OpenAiCompatibleProviderRuntimeConfig {
-  return {
-    name: instance.label,
-    baseUrlEnvVarName: instance.baseUrlEnvVarName,
-    fallbackBaseUrl: OPENAI_COMPATIBLE_DEFAULT_FALLBACK_BASE_URL,
-    apiKeyEnvVarName: instance.apiKeyEnvVarName,
-    keyless: false,
-    allowOpenAiEnvFallback: false,
-  };
-}
-
-function resolveNamedOpenAiCompatibleInstance(
+function resolveOpenAiCompatibleProviderRuntimeConfig(
   providerId: string,
   runtimeEnv: NodeJS.ProcessEnv,
-): OpenAiCompatibleProviderInstance | null {
+): OpenAiCompatibleProviderRuntimeConfig | null {
+  const staticProvider =
+    STATIC_OPENAI_COMPATIBLE_PROVIDER_CONFIGS[
+      providerId as StaticOpenAiCompatibleProviderId
+    ];
+  if (staticProvider) {
+    return staticProvider;
+  }
+
+  if (!isOpenAiCompatibleProviderId(providerId)) {
+    return null;
+  }
+
   const instance = getOpenAiCompatibleProviderInstance(providerId);
   if (!instance?.slug) {
     return null;
   }
 
-  if (!instance.labelEnvVarName) {
-    return instance;
-  }
+  const configuredLabel = instance.labelEnvVarName
+    ? runtimeEnv[instance.labelEnvVarName]?.trim()
+    : undefined;
+  const resolvedInstance = configuredLabel
+    ? (getOpenAiCompatibleProviderInstance(providerId, {
+        label: configuredLabel,
+      }) ?? instance)
+    : instance;
 
-  const label = runtimeEnv[instance.labelEnvVarName]?.trim();
-  if (!label) {
-    return instance;
-  }
-
-  return getOpenAiCompatibleProviderInstance(providerId, { label }) ?? instance;
-}
-
-function getOpenAiCompatibleRuntimeConfigs(
-  modelIds: Array<string | undefined>,
-  runtimeEnv: NodeJS.ProcessEnv,
-): Map<string, OpenAiCompatibleProviderRuntimeConfig> {
-  const configs = new Map<string, OpenAiCompatibleProviderRuntimeConfig>();
-
-  for (const [providerId, provider] of Object.entries(
-    STATIC_OPENAI_COMPATIBLE_PROVIDER_CONFIGS,
-  ) as Array<
-    [StaticOpenAiCompatibleProviderId, OpenAiCompatibleProviderRuntimeConfig]
-  >) {
-    configs.set(providerId, provider);
-  }
-
-  const candidateProviderIds = new Set<string>();
-
-  for (const modelId of modelIds) {
-    const providerId = modelId?.trim().split('/')[0];
-    if (providerId && isOpenAiCompatibleProviderId(providerId)) {
-      candidateProviderIds.add(providerId);
-    }
-  }
-
-  for (const instance of listOpenAiCompatibleProviderInstancesFromEnvNames(
-    Object.keys(runtimeEnv),
-  )) {
-    candidateProviderIds.add(instance.id);
-  }
-
-  for (const providerId of candidateProviderIds) {
-    if (configs.has(providerId)) {
-      continue;
-    }
-
-    const instance = resolveNamedOpenAiCompatibleInstance(
-      providerId,
-      runtimeEnv,
-    );
-    if (!instance) {
-      continue;
-    }
-
-    configs.set(providerId, toNamedOpenAiCompatibleRuntimeConfig(instance));
-  }
-
-  return configs;
+  return {
+    name: resolvedInstance.label,
+    baseUrlEnvVarName: resolvedInstance.baseUrlEnvVarName,
+    fallbackBaseUrl: OPENAI_COMPATIBLE_DEFAULT_FALLBACK_BASE_URL,
+    apiKeyEnvVarName: resolvedInstance.apiKeyEnvVarName,
+    keyless: false,
+    allowOpenAiEnvFallback: false,
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -156,12 +106,24 @@ export function mergeNonTaskOpenAiCompatibleProviderConfig(
   modelIds: Array<string | undefined>,
 ): Record<string, unknown> {
   let merged = providerConfig;
-  const runtimeConfigs = getOpenAiCompatibleRuntimeConfigs(
-    modelIds,
-    runtimeEnv,
-  );
+  const providerIds = [
+    ...new Set(
+      modelIds.flatMap((modelId) => {
+        const providerId = modelId?.trim().split('/')[0];
+        return providerId ? [providerId] : [];
+      }),
+    ),
+  ];
 
-  for (const [providerId, provider] of runtimeConfigs) {
+  for (const providerId of providerIds) {
+    const provider = resolveOpenAiCompatibleProviderRuntimeConfig(
+      providerId,
+      runtimeEnv,
+    );
+    if (!provider) {
+      continue;
+    }
+
     const prefix = `${providerId}/`;
     const modelIdsForProvider = [
       ...new Set(
@@ -174,10 +136,6 @@ export function mergeNonTaskOpenAiCompatibleProviderConfig(
         }),
       ),
     ];
-
-    if (modelIdsForProvider.length === 0) {
-      continue;
-    }
 
     const existingProvider = asRecord(merged[providerId]);
     const existingOptions = asRecord(existingProvider.options);
@@ -195,8 +153,7 @@ export function mergeNonTaskOpenAiCompatibleProviderConfig(
       ? { apiKey: `{env:${provider.apiKeyEnvVarName}}` }
       : provider.keyless
         ? { apiKey: 'ollama' }
-        : provider.allowOpenAiEnvFallback &&
-            runtimeEnv.OPENAI_API_KEY?.trim()
+        : provider.allowOpenAiEnvFallback && runtimeEnv.OPENAI_API_KEY?.trim()
           ? { apiKey: '{env:OPENAI_API_KEY}' }
           : {};
 
