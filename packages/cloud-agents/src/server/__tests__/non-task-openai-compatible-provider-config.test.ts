@@ -81,89 +81,98 @@ describe('non-task OpenAI-compatible provider config', () => {
     expect(configContent).not.toContain('super-secret-key');
   });
 
-  it('preserves generated LiteLLM reasoning options while adding endpoint metadata', () => {
-    const env = buildOpenCodeCliEnv({
-      R_MODEL: `litellm/${MODEL_ID}`,
-      R_MODEL_REASONING_EFFORT: 'high',
-      LITELLM_BASE_URL: 'http://litellm:4000/v1',
-      LITELLM_API_KEY: 'secret',
-    });
+  it(
+    'preserves generated LiteLLM reasoning options while adding endpoint metadata',
+    () => {
+      const env = buildOpenCodeCliEnv({
+        R_MODEL: `litellm/${MODEL_ID}`,
+        R_MODEL_REASONING_EFFORT: 'high',
+        LITELLM_BASE_URL: 'http://litellm:4000/v1',
+        LITELLM_API_KEY: 'secret',
+      });
 
-    expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}')).toEqual({
-      model: `litellm/${MODEL_ID}`,
-      small_model: `litellm/${MODEL_ID}`,
-      provider: {
-        litellm: {
-          npm: '@ai-sdk/openai-compatible',
-          name: 'LiteLLM',
-          options: {
-            baseURL: 'http://litellm:4000/v1',
-            apiKey: '{env:LITELLM_API_KEY}',
-          },
-          models: {
-            [MODEL_ID]: {
-              name: MODEL_ID,
-              options: { reasoningEffort: 'high' },
+      expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}')).toEqual({
+        model: `litellm/${MODEL_ID}`,
+        small_model: `litellm/${MODEL_ID}`,
+        provider: {
+          litellm: {
+            npm: '@ai-sdk/openai-compatible',
+            name: 'LiteLLM',
+            options: {
+              baseURL: 'http://litellm:4000/v1',
+              apiKey: '{env:LITELLM_API_KEY}',
+            },
+            models: {
+              [MODEL_ID]: {
+                name: MODEL_ID,
+                options: { reasoningEffort: 'high' },
+              },
             },
           },
         },
-      },
-      permission: NON_TASK_TOOL_PERMISSION_DENIALS,
-    });
-  });
+        permission: NON_TASK_TOOL_PERMISSION_DENIALS,
+      });
+    },
+  );
 
-  it('configures named OpenAI-compatible connections without inlining secrets', () => {
-    const env = buildOpenCodeCliEnv({
-      R_MODEL: `openai-compatible-local/${MODEL_ID}`,
-      OPENAI_COMPATIBLE_LOCAL_BASE_URL: 'http://lm-studio:1234/v1',
-      OPENAI_COMPATIBLE_LOCAL_API_KEY: 'named-provider-secret',
-      OPENAI_COMPATIBLE_LOCAL_LABEL: 'Local LM Studio',
-    });
+  it(
+    'configures named OpenAI-compatible connections without inlining secrets',
+    () => {
+      const env = buildOpenCodeCliEnv({
+        R_MODEL: `openai-compatible-local/${MODEL_ID}`,
+        OPENAI_COMPATIBLE_LOCAL_BASE_URL: 'http://lm-studio:1234/v1',
+        OPENAI_COMPATIBLE_LOCAL_API_KEY: 'named-provider-secret',
+        OPENAI_COMPATIBLE_LOCAL_LABEL: 'Local LM Studio',
+      });
 
-    const configContent = env.OPENCODE_CONFIG_CONTENT ?? '{}';
-    const config = JSON.parse(configContent) as {
-      provider: Record<string, unknown>;
-    };
+      const configContent = env.OPENCODE_CONFIG_CONTENT ?? '{}';
+      const config = JSON.parse(configContent) as {
+        provider: Record<string, unknown>;
+      };
 
-    expect(config.provider['openai-compatible-local']).toEqual({
-      npm: '@ai-sdk/openai-compatible',
-      name: 'OpenAI-compatible (Local LM Studio)',
-      options: {
-        baseURL: 'http://lm-studio:1234/v1',
-        apiKey: '{env:OPENAI_COMPATIBLE_LOCAL_API_KEY}',
-      },
-      models: {
-        [MODEL_ID]: { name: MODEL_ID },
-      },
-    });
-    expect(configContent).not.toContain('named-provider-secret');
-  });
+      expect(config.provider['openai-compatible-local']).toEqual({
+        npm: '@ai-sdk/openai-compatible',
+        name: 'OpenAI-compatible (Local LM Studio)',
+        options: {
+          baseURL: 'http://lm-studio:1234/v1',
+          apiKey: '{env:OPENAI_COMPATIBLE_LOCAL_API_KEY}',
+        },
+        models: {
+          [MODEL_ID]: { name: MODEL_ID },
+        },
+      });
+      expect(configContent).not.toContain('named-provider-secret');
+    },
+  );
 
-  it('does not inherit generic OpenAI credentials for the default compatible provider', () => {
-    const env = buildOpenCodeCliEnv({
-      R_MODEL: `openai-compatible/${MODEL_ID}`,
-      OPENAI_COMPATIBLE_BASE_URL: 'http://custom-provider:4000/v1',
-      OPENAI_BASE_URL: 'http://generic-openai:4000/v1',
-      OPENAI_API_KEY: 'generic-openai-secret',
-    });
+  it(
+    'does not inherit generic OpenAI credentials for the default compatible provider',
+    () => {
+      const env = buildOpenCodeCliEnv({
+        R_MODEL: `openai-compatible/${MODEL_ID}`,
+        OPENAI_COMPATIBLE_BASE_URL: 'http://custom-provider:4000/v1',
+        OPENAI_BASE_URL: 'http://generic-openai:4000/v1',
+        OPENAI_API_KEY: 'generic-openai-secret',
+      });
 
-    const configContent = env.OPENCODE_CONFIG_CONTENT ?? '{}';
-    const config = JSON.parse(configContent) as {
-      provider: Record<string, unknown>;
-    };
+      const configContent = env.OPENCODE_CONFIG_CONTENT ?? '{}';
+      const config = JSON.parse(configContent) as {
+        provider: Record<string, unknown>;
+      };
 
-    expect(config.provider['openai-compatible']).toEqual({
-      npm: '@ai-sdk/openai-compatible',
-      name: 'OpenAI-compatible',
-      options: {
-        baseURL: 'http://custom-provider:4000/v1',
-      },
-      models: {
-        [MODEL_ID]: { name: MODEL_ID },
-      },
-    });
-    expect(configContent).not.toContain('generic-openai-secret');
-  });
+      expect(config.provider['openai-compatible']).toEqual({
+        npm: '@ai-sdk/openai-compatible',
+        name: 'OpenAI-compatible',
+        options: {
+          baseURL: 'http://custom-provider:4000/v1',
+        },
+        models: {
+          [MODEL_ID]: { name: MODEL_ID },
+        },
+      });
+      expect(configContent).not.toContain('generic-openai-secret');
+    },
+  );
 
   it('allows vLLM to use the generic OpenAI credential fallback', () => {
     const env = buildOpenCodeCliEnv({
