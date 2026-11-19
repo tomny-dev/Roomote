@@ -86,7 +86,7 @@ const DEEP_LINK_ENABLE_DESCRIPTIONS: Record<string, string> = {
     'Roomote will be able to inspect dashboards, alert rules, live alert state, annotations, and data sources.',
   github:
     'Roomote will be able to inspect PRs, issues, and repository context.',
-  jira: 'Roomote will be able to inspect Jira issues, workflows, and JQL search results.',
+  jira: 'Roomote will be able to search, create, and update Jira issues using the connected Atlassian account.',
   linear:
     'Roomote will be able to pull issue, project, and roadmap context into tasks.',
   monday:
