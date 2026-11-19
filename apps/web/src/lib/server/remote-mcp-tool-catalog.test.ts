@@ -22,7 +22,7 @@ const handshakeError = (
 
 describe('requestRemoteMcpToolCatalog', () => {
   it('loads a stateless server directly without a handshake', async () => {
-    const postJsonRpc = vi.fn(async () =>
+    const postJsonRpc = vi.fn(async (_body: Record<string, unknown>) =>
       jsonRpcResponse({
         jsonrpc: '2.0',
         id: 2,
