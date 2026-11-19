@@ -1,23 +1,54 @@
 ---
 title: Jira
-description: Bring Jira issue and project context into Roomote tasks.
+description: Search, create, and update Jira work items from Roomote tasks.
 icon: 'https://api.iconify.design/simple-icons:jira.svg?color=currentColor'
 ---
 
-Connect Jira when your team already tracks engineering work there and you want
-Roomote to read issue, project, workflow, and JQL-backed context directly.
+Roomote uses Atlassian's official **MCP v2** server for Jira. Agents can
+search, read, create, edit, transition, and comment on work items, subject to
+the permissions of the connected Atlassian account.
 
-## When to use it
+## Connect Jira
 
-- Start with the acceptance criteria and discussion already on the Jira issue
-- Inspect related issues or project context before planning work
-- Keep the prompt grounded in the same ticket system your team already uses
+1. As a Roomote deployment admin, open **Settings > Integrations**.
+2. Add or enable **Jira**, then authorize Roomote through Atlassian's OAuth
+   consent flow.
+3. Grant access to the correct Atlassian site and confirm the issue-level
+   permissions.
+4. Open **Manage tools** to check the available tools and disable individual
+   operations that Roomote agents should not use.
 
-## How setup works
+The connection is deployment-scoped, so authorized Roomote agents can use it
+for both interactive and unattended tasks. Jira access is limited by the
+connected account's Atlassian project permissions and the enabled MCP tools.
 
-Admins connect Jira from **Settings > Integrations** for the deployment.
+Roomote requests Jira **read**, **search**, and **write** permissions. It does
+not request Jira deletion or project administration permissions.
 
-## What to expect
+## Migrating from Jira MCP v1
 
-Jira gives Roomote richer issue context. The task transcript, evidence, and any
-resulting code review still live in Roomote and your repository workflow.
+The previous Jira integration used Atlassian's v1 MCP server. **v2 uses a
+different OAuth resource; existing v1 credentials do not carry over.** After
+upgrading Roomote, reconnect Jira in **Settings > Integrations** and complete
+Atlassian consent again. There is no need to add a second Jira integration.
+
+Roomote uses the [official v2 MCP endpoint with a flat tool catalog](https://support.atlassian.com/atlassian-ai-gateway/docs/how-to-upgrade-from-atlassian-mcp-v1-to-atlassian-mcp-v2/)
+so that per-tool enablement controls work through its shared MCP proxy.
+
+## Verify it works
+
+1. Open **Manage tools** and confirm issue operations such as
+   `getJiraIssue`, `searchJiraIssuesUsingJql`, and `createJiraIssue` are
+   available to the connected account.
+2. Ask a Roomote agent to retrieve a known issue, for example:
+   "Read issue PROJECT-123 and summarize the acceptance criteria."
+3. Create a test issue in a project where the connected account has permission,
+   then ask the agent to update or comment on it.
+4. Run a similar request from a scheduled agent to verify unattended access.
+
+If tools are missing, check the consented scopes, Atlassian organization MCP
+permissions, and the connected account's Jira project permissions. An error
+about a missing MCP session can also indicate that the deployment is still
+running an older version of Roomote.
+
+For details, see [Atlassian's MCP setup guide](https://support.atlassian.com/atlassian-ai-gateway/docs/get-started-with-the-atlassian-remote-mcp-server/).
