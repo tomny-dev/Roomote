@@ -29,6 +29,7 @@ describe('Jira MCP v2 proxy tool policy', () => {
     expect(allowedToolNames).toEqual(
       expect.arrayContaining([
         'getJiraIssue',
+        'getJiraIssueTypeMetaWithFields',
         'searchJiraIssuesUsingJql',
         'listJiraIssueTransitions',
         'listJiraIssueComments',
