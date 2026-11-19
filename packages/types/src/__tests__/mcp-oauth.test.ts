@@ -45,3 +45,27 @@ describe('monday.com OAuth', () => {
     );
   });
 });
+
+describe('Jira MCP v2', () => {
+  it('exposes the flat catalog with least-privilege issue read, search, and write scopes', () => {
+    expect(getMcpIntegration('jira')).toMatchObject({
+      url: 'https://mcp.atlassian.com/v2/mcp?tools=all',
+      connectionScope: 'deployment',
+      serverMode: 'upstream_proxy',
+    });
+    expect(getMcpIntegrationOauthScopes('jira')).toEqual([
+      'read:me',
+      'read:account',
+      'offline_access',
+      'read:jira:agent-interface',
+      'search:jira:agent-interface',
+      'write:jira:agent-interface',
+    ]);
+    expect(getMcpIntegrationOauthScopes('jira')).not.toContain(
+      'delete:jira:agent-interface',
+    );
+    expect(getMcpIntegrationOauthScopes('jira')).not.toContain(
+      'manage:jira:agent-interface',
+    );
+  });
+});
