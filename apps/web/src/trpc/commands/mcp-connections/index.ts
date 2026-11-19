@@ -36,6 +36,7 @@ import type { StaticOauthReadiness } from '@/lib/server/mcp-static-oauth';
 import { getDeploymentStaticOauthReadiness } from '@/lib/server/deployment-static-oauth';
 import { Env } from '@/lib/server/env';
 import { MCP_TOOL_CATALOG_REQUIRES_PERSONAL_CONNECTION } from '@/lib/mcp-tool-errors';
+import { requestRemoteMcpToolCatalog } from '@/lib/server/remote-mcp-tool-catalog';
 import type {
   SaveAsanaConnectionInput,
   SaveGrafanaConnectionInput,
@@ -208,15 +209,6 @@ async function fetchUpstreamMcpTools(input: {
 
   const reconnectMessage = `${resolvedIntegration.name} needs to be reconnected before tools can be managed.`;
 
-  function isTimeoutError(error: unknown): boolean {
-    return (
-      (error instanceof DOMException &&
-        (error.name === 'TimeoutError' || error.name === 'AbortError')) ||
-      (error instanceof Error &&
-        error.message.includes('The operation was aborted due to timeout'))
-    );
-  }
-
   function extractUpstreamErrorMessage(
     bodyText: string,
     contentType: string | null,
@@ -341,143 +333,57 @@ async function fetchUpstreamMcpTools(input: {
       signal: AbortSignal.timeout(MCP_TOOL_CATALOG_TIMEOUT_MS),
     });
 
-  async function listToolsWithInitializedSession(): Promise<{
-    response: Response;
-    responseBody: string;
-  }> {
-    const initializeResponse = await postJsonRpc(
-      {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: {
-          protocolVersion: MCP_PROTOCOL_VERSION,
-          capabilities: {},
-          clientInfo: {
-            name: 'roomote-admin',
-            version: '0.0.0',
-          },
-        },
-      },
-      {
-        'mcp-protocol-version': MCP_PROTOCOL_VERSION,
-      },
-    );
+  const pages = await requestRemoteMcpToolCatalog({
+    postJsonRpc,
+    protocolVersion: MCP_PROTOCOL_VERSION,
+    onHandshakeError: (response, responseBody, action) =>
+      buildUpstreamToolLoadError({ response, responseBody, action }),
+  });
 
-    const initializeResponseBody = await initializeResponse.text();
-
-    if (!initializeResponse.ok) {
+  const tools: Array<Record<string, unknown>> = [];
+  for (const { response, responseBody } of pages) {
+    if (!response.ok) {
       throw buildUpstreamToolLoadError({
-        response: initializeResponse,
-        responseBody: initializeResponseBody,
-        action: 'initialize',
+        response,
+        responseBody,
+        action: 'load tools',
       });
     }
 
-    const sessionHeaders: Record<string, string> = {
-      'mcp-protocol-version': MCP_PROTOCOL_VERSION,
-    };
-    const sessionId = initializeResponse.headers.get('mcp-session-id');
-    if (sessionId) {
-      sessionHeaders['mcp-session-id'] = sessionId;
-    }
-
-    const initializedResponse = await postJsonRpc(
-      {
-        jsonrpc: '2.0',
-        method: 'notifications/initialized',
-      },
-      sessionHeaders,
-    );
-
-    const initializedResponseBody = await initializedResponse.text();
-
-    if (!initializedResponse.ok) {
-      throw buildUpstreamToolLoadError({
-        response: initializedResponse,
-        responseBody: initializedResponseBody,
-        action: 'initialize MCP session',
-      });
-    }
-
-    const response = await postJsonRpc(
-      {
-        jsonrpc: '2.0',
-        id: 2,
-        method: 'tools/list',
-      },
-      sessionHeaders,
-    );
-    const responseBody = await response.text();
-    return { response, responseBody };
-  }
-
-  let response: Response;
-  let responseBody: string;
-
-  try {
-    response = await postJsonRpc({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'tools/list',
-    });
-    responseBody = await response.text();
-  } catch (error) {
-    if (!isTimeoutError(error)) {
-      throw error;
-    }
-
-    ({ response, responseBody } = await listToolsWithInitializedSession());
-  }
-
-  if (
-    !response.ok &&
-    response.status === 400 &&
-    responseBody.includes('Mcp-Session-Id')
-  ) {
-    ({ response, responseBody } = await listToolsWithInitializedSession());
-  }
-
-  if (!response.ok) {
-    throw buildUpstreamToolLoadError({
-      response,
+    const payload = parseMcpJsonRpcPayload(
       responseBody,
-      action: 'load tools',
-    });
-  }
+      response.headers.get('content-type'),
+    ) as McpToolsListJsonRpcPayload | null;
 
-  const payload = parseMcpJsonRpcPayload(
-    responseBody,
-    response.headers.get('content-type'),
-  ) as McpToolsListJsonRpcPayload | null;
-
-  if (!payload) {
-    throw new Error(
-      `Failed to load tools from ${resolvedIntegration.name}: upstream tools/list returned an invalid payload.`,
-    );
-  }
-
-  if (payload.error) {
-    const upstreamMessage =
-      typeof payload.error.message === 'string' &&
-      payload.error.message.trim().length > 0
-        ? payload.error.message.trim()
-        : 'upstream MCP server returned a JSON-RPC error';
-    if (shouldReconnectFromUpstreamError(null, upstreamMessage)) {
-      throw new Error(reconnectMessage);
+    if (!payload) {
+      throw new Error(
+        `Failed to load tools from ${resolvedIntegration.name}: upstream tools/list returned an invalid payload.`,
+      );
     }
-    throw new Error(
-      `Failed to load tools from ${resolvedIntegration.name}: ${upstreamMessage}`,
-    );
+
+    if (payload.error) {
+      const upstreamMessage =
+        typeof payload.error.message === 'string' &&
+        payload.error.message.trim().length > 0
+          ? payload.error.message.trim()
+          : 'upstream MCP server returned a JSON-RPC error';
+      if (shouldReconnectFromUpstreamError(null, upstreamMessage)) {
+        throw new Error(reconnectMessage);
+      }
+      throw new Error(
+        `Failed to load tools from ${resolvedIntegration.name}: ${upstreamMessage}`,
+      );
+    }
+
+    if (!Array.isArray(payload.result?.tools)) {
+      throw new Error(
+        `Failed to load tools from ${resolvedIntegration.name}: upstream tools/list returned an invalid payload.`,
+      );
+    }
+
+    tools.push(...payload.result.tools);
   }
 
-  if (!Array.isArray(payload.result?.tools)) {
-    throw new Error(
-      `Failed to load tools from ${resolvedIntegration.name}: upstream tools/list returned an invalid payload.`,
-    );
-  }
-
-  const tools = payload.result.tools;
   const allowedToolNames =
     getAllowedIntegrationMcpToolNames(resolvedIntegration);
   const filteredTools = filterMcpToolDefinitions(
