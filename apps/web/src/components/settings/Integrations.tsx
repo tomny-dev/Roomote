@@ -1588,26 +1588,6 @@ export function Integrations() {
                   }
                 : undefined,
             onAction: () => {
-                        connectMcp.mutate(
-                          { mcpId: integration.id, redirectTo: pathname },
-                          {
-                            onSuccess: (url) => {
-                              window.location.href = url;
-                            },
-                            onError: (error) =>
-                              toast.error(
-                                error instanceof Error
-                                  ? error.message
-                                  : `Failed to connect ${displayName}.`,
-                              ),
-                          },
-                        );
-                      },
-                      isPending: isConnectPending,
-                      icon: <RefreshCw className="size-4" />,
-                    }
-                  : undefined,
-            onAction: () => {
               if (!enabled && isDeploymentScoped) {
                 connectMcp.mutate(
                   { mcpId: integration.id, redirectTo: pathname },
