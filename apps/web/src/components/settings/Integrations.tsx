@@ -1545,6 +1545,31 @@ export function Integrations() {
               enabled && isDeploymentScoped && !isConnected ? (
                 <TriangleAlert className="size-4" />
               ) : undefined,
+            headerAction:
+              isAdmin && enabled && isDeploymentScoped
+                ? {
+                    label: 'Reconnect account',
+                    ariaLabel: `Reconnect ${displayName} workspace account`,
+                    onAction: () => {
+                      connectMcp.mutate(
+                        { mcpId: integration.id, redirectTo: pathname },
+                        {
+                          onSuccess: (url) => {
+                            window.location.href = url;
+                          },
+                          onError: (error) =>
+                            toast.error(
+                              error instanceof Error
+                                ? error.message
+                                : `Failed to connect ${displayName}.`,
+                            ),
+                        },
+                      );
+                    },
+                    isPending: isConnectPending,
+                    icon: <RefreshCw className="size-4" />,
+                  }
+                : undefined,
             secondaryAction:
               isAdmin &&
               enabled &&
@@ -1561,11 +1586,8 @@ export function Integrations() {
                     isPending: false,
                     icon: <Settings2 className="size-4" />,
                   }
-                : enabled && isDeploymentScoped && !isConnected
-                  ? {
-                      label: 'Reconnect account',
-                      ariaLabel: `Reconnect ${displayName} workspace account`,
-                      onAction: () => {
+                : undefined,
+            onAction: () => {
                         connectMcp.mutate(
                           { mcpId: integration.id, redirectTo: pathname },
                           {
