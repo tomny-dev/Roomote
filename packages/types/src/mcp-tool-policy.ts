@@ -130,6 +130,48 @@ const JIRA_READ_ONLY_TOOL_NAMES = [
   'getVisibleJiraProjects',
   'lookupJiraAccountId',
   'searchJiraIssuesUsingJql',
+  // Atlassian MCP v2's flat catalog uses these names for Jira read operations.
+  'listJiraProjects',
+  'listJiraProjectIssueTypesMetadata',
+  'listJiraIssueTransitions',
+  'listJiraIssueLinkTypes',
+  'listJiraIssueRemoteIssueLinks',
+  'listJiraIssueWorklogs',
+  'listJiraIssueAssignableUsers',
+  'listJiraIssueComments',
+  'listJiraIssueChangelogs',
+  'getJiraCurrentUser',
+  'getJiraUser',
+  'listJiraStatuses',
+  'listJiraProjectComponents',
+  'getJiraProjectVersions',
+  'getJiraProjectVersionRelatedWork',
+  'listJiraBoards',
+  'getJiraBoardConfig',
+  'getJiraBoardIssueData',
+  'getJiraBoardSprintData',
+  'listJiraBoardSprints',
+  'listJiraFilters',
+  'listJiraDashboards',
+  'getJiraEntityProperty',
+  'downloadJiraIssueAttachment',
+] as const;
+
+// Intentionally limited to Jira work-item writes. Do not allow generic
+// executeWrite/executeDestructive, deletion, project administration, or
+// broader Atlassian product operations through this deployment proxy.
+const JIRA_ISSUE_WRITE_TOOL_NAMES = [
+  'createJiraIssue',
+  'editJiraIssue',
+  'transitionJiraIssue',
+  'addOrEditJiraIssueComment',
+  'createJiraIssueLink',
+  'watchJiraIssue',
+] as const;
+
+const JIRA_ALLOWED_TOOL_NAMES = [
+  ...JIRA_READ_ONLY_TOOL_NAMES,
+  ...JIRA_ISSUE_WRITE_TOOL_NAMES,
 ] as const;
 
 const MONDAY_READ_ONLY_TOOL_NAMES = [
@@ -164,7 +206,7 @@ const INTEGRATION_MCP_ALLOWED_TOOL_NAMES: Readonly<
 > = {
   betterstack: BETTER_STACK_READ_ONLY_TOOL_NAMES,
   grafana: GRAFANA_READ_ONLY_TOOL_NAMES,
-  jira: JIRA_READ_ONLY_TOOL_NAMES,
+  jira: JIRA_ALLOWED_TOOL_NAMES,
   monday: MONDAY_READ_ONLY_TOOL_NAMES,
   pylon: PYLON_READ_ONLY_TOOL_NAMES,
   railway: RAILWAY_READ_ONLY_TOOL_NAMES,
