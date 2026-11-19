@@ -287,17 +287,23 @@ export const MCP_INTEGRATIONS: McpIntegration[] = [
   {
     id: 'jira',
     name: 'Jira',
-    url: 'https://mcp.atlassian.com/v1/mcp/authv2',
-    description: `Access Jira issues, projects, workflows, and JQL search from ${PRODUCT_NAME} tasks`,
+    // Expose the flat tool catalog so Roomote's proxy can enforce tool-level
+    // enablements instead of only filtering v2's discovery/execute tools.
+    url: 'https://mcp.atlassian.com/v2/mcp?tools=all',
+    description: `Read, search, create, and update Jira issues from ${PRODUCT_NAME} tasks`,
     icon: 'jira',
     connectionScope: 'deployment',
+    serverMode: 'upstream_proxy',
     oauthScopes: [
       'read:me',
       'read:account',
       'offline_access',
-      'read:jira-work',
-      'search:jira-work',
+      'read:jira:agent-interface',
+      'search:jira:agent-interface',
+      'write:jira:agent-interface',
     ],
+    instructions:
+      'Use Jira tools to search, read, create, edit, transition, and comment on Jira issues as required by the task. Do not delete issues or change Jira administration settings.',
   },
   {
     id: 'linear',
