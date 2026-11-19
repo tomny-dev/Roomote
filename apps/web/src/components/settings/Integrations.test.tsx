@@ -1022,7 +1022,7 @@ describe('Integrations settings', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Roomote will be able to inspect Jira issues, workflows, and JQL search results.',
+        'Roomote will be able to search, create, and update Jira issues using the connected Atlassian account.',
       ),
     ).toBeInTheDocument();
   });
